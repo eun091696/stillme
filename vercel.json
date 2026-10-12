@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/internal/assets/cleanup?limit=100",
+      "schedule": "0 18 * * *"
+    }
+  ]
+}

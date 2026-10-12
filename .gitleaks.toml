@@ -1,0 +1,22 @@
+title = "AI Photo Studio Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Allow only the exact synthetic CI validation marker, never a real publishable key"
+  condition = "AND"
+  regexTarget = "line"
+  paths = ['''^\.github/workflows/ci\.yml$''']
+  regexes = ['''^\s*NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:\s+sb_publishable_ci_validation_only\s*$''']
+
+  [[rules.allowlists]]
+  description = "Historical unit-test idempotency UUID, not an authentication credential"
+  condition = "AND"
+  commits = ["b0586d80176a30bbfc35a5088e8aab5812abaec9"]
+  paths = ['''^src/lib/admin/corrective-action\.test\.ts$''']
+  regexTarget = "line"
+  regexes = ['''^\s*(?:formData\.set\("idempotencyKey", "|idempotencyKey: ")223e4567-e89b-42d3-a456-426614174000"(?:\);|,)\s*$''']
