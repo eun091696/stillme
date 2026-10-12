@@ -1,0 +1,1 @@
+export { basicIdRuntimePrompt } from "./prompt";

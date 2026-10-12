@@ -1,0 +1,1 @@
+export { idPhotoRuntimePrompt } from "./prompt";
