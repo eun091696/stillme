@@ -25,7 +25,7 @@
     "test:db": "node scripts/test-local-db.mjs",
     "docs:bootstrap": "node scripts/bootstrap-company.mjs",
     "docs:check": "node scripts/check-docs.mjs",
-    "validate": "npm run docs:check && npm run typecheck && npm run lint && npm run test && npm run build && npm run performance:check && npm run security:bundle-check"
+    "validate": "npm run docs:check && npm run typecheck && npm run lint && npm run test && npm run build && npm run security:bundle-check && npm run performance:check"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1137.0",

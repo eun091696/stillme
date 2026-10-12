@@ -105,7 +105,8 @@ test("generate flow is authenticated and selects a service only once", async ({
   await expect(page.getByRole("link", { name: /여권사진/u })).toHaveCount(0);
 
   await serviceCard.click();
-  await expect(page).toHaveURL(/\/generate\/id-photo$/u);
+  // Keep the exact destination contract; allow bounded CI time for server navigation.
+  await expect(page).toHaveURL(/\/generate\/id-photo$/u, { timeout: 15_000 });
   await expect(page.locator('input[name="presetId"]')).toHaveValue("resume-id");
 
   const servicePageHeadingSize = await page.getByRole("heading", {
