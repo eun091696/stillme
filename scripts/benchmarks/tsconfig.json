@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": "../..",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rootDir": "../..",
+    "outDir": "../../.benchmark-build",
+    "noEmit": false,
+    "incremental": false
+  },
+  "include": [
+    "./id-photo-consistency.ts",
+    "../../src/lib/benchmarks/id-photo-consistency.ts",
+    "../../src/lib/generation/model.ts",
+    "../../src/lib/generation/validation.ts",
+    "../../src/lib/prompts/runtime/id-photo/prompt.ts",
+    "../../src/lib/prompts/types.ts"
+  ]
+}
