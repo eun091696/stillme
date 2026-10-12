@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_validation_only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Validate documentation, types, lint, tests, and build
+        env:
+          GOOGLE_AI_API_KEY: APS_CLIENT_BUNDLE_CANARY_GOOGLE_AI
+          R2_ACCESS_KEY_ID: APS_CLIENT_BUNDLE_CANARY_R2_ACCESS
+          R2_SECRET_ACCESS_KEY: APS_CLIENT_BUNDLE_CANARY_R2_SECRET
+          SUPABASE_SERVICE_ROLE_KEY: APS_CLIENT_BUNDLE_CANARY_SUPABASE_ADMIN
+          TOSS_SECRET_KEY: APS_CLIENT_BUNDLE_CANARY_TOSS
+        run: npm run validate
+
+      - name: Audit development and production dependencies
+        run: npm audit --audit-level=high
+
+  database:
+    name: Database and Auth
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Use Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase
+        run: npx supabase start >/dev/null
+
+      - name: Verify migrations and RLS
+        run: npm run test:db
+
+      - name: Verify Auth integration
+        run: npm run test:integration
+
+      - name: Install Chromium for browser E2E
+        run: npm exec playwright install --with-deps chromium
+
+      - name: Verify browser E2E
+        run: npm run test:e2e
+
+      - name: Exercise payment reconciliation incident
+        run: npm run incident:drill:payment
+
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop --no-backup
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Fetch every branch, tag, and pull-request history
+        run: |
+          git fetch --force origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' '+refs/pull/*/head:refs/remotes/pull/*/head' '+refs/pull/*/merge:refs/remotes/pull/*/merge'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          remote_heads=$(git ls-remote --heads origin | wc -l)
+          fetched_heads=$(git for-each-ref --format='%(refname)' refs/remotes/origin | grep -v '^refs/remotes/origin/HEAD$' | wc -l)
+          test "$remote_heads" -eq "$fetched_heads"
+          {
+            echo '## Full-history secret scan coverage'
+            echo "Remote branches: $remote_heads; fetched branches: $fetched_heads"
+            echo "Tags: $(git tag --list | wc -l)"
+            echo "Pull-request refs: $(git for-each-ref --format='%(refname)' refs/remotes/pull | wc -l)"
+            echo "Reachable commits: $(git rev-list --all --count)"
+            git for-each-ref --format='%(objectname) %(refname)' refs/remotes/origin refs/tags refs/remotes/pull
+          } >> "$GITHUB_STEP_SUMMARY"
+          git log --all --format= --name-only | LC_ALL=C sort -u > "$RUNNER_TEMP/history-paths.txt"
+          if grep -Ei '(^|/)(\.env($|\.(local|production|development|test|staging)(\.|$))|id_(rsa|ed25519)|credentials|service[-_]?account[^/]*\.json$)|\.(p12|pfx|key|pem)$' "$RUNNER_TEMP/history-paths.txt"; then
+            echo 'Sensitive file paths found in history; manual security review required.'
+            exit 1
+          fi
+
+      - name: Scan repository history
+        uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+
+      - name: Explicitly scan all reachable Git history with redacted output
+        run: |
+          scanner=$(command -v gitleaks || find /tmp /opt "$HOME" -type f -name gitleaks -perm /111 2>/dev/null | head -n 1)
+          test -n "$scanner"
+          status=0
+          "$scanner" detect --source . --config .gitleaks.toml --log-opts="--all --full-history" --redact --exit-code=1 --report-format=json --report-path="$RUNNER_TEMP/all-history-gitleaks.json" || status=$?
+          node -e 'const fs=require("fs"); const p=process.env.RUNNER_TEMP+"/all-history-gitleaks.json"; if(!fs.existsSync(p))process.exit(1); const findings=JSON.parse(fs.readFileSync(p)); const safe=findings.map(({RuleID,File,StartLine,Commit})=>({rule:RuleID,file:File,line:StartLine,commit:Commit})); console.log(JSON.stringify(safe,null,2)); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,"\n## Redacted finding locations\n\n"+JSON.stringify(safe,null,2)+"\n");'
+          test "$status" -eq 0
+          echo 'All branch, tag, and pull-request histories passed the redacted secret scan.' >> "$GITHUB_STEP_SUMMARY"
