@@ -1,0 +1,2 @@
+-- Keep local seed data deterministic and free of credentials or personal data.
+-- Authentication users are created by application and database tests as needed.

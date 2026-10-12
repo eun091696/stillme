@@ -1,0 +1,9 @@
+{
+  "name": "@stillme/next-eslint-glob",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bounded directory-glob adapter for Next.js ESLint rootDir resolution",
+  "main": "index.cjs",
+  "engines": { "node": ">=22" },
+  "dependencies": { "tinyglobby": "0.2.17" }
+}
