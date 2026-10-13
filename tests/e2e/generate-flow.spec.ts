@@ -156,6 +156,8 @@ test("generate flow is authenticated and selects a service only once", async ({
     ),
   });
   await expect(page.getByAltText("업로드한 사진 미리보기")).toBeVisible();
+  const idPreviewUrl = await page.getByAltText("업로드한 사진 미리보기").getAttribute("src");
+  expect(idPreviewUrl).toMatch(/^blob:/u);
   await expect(nextStepButton).toBeEnabled();
   await nextStepButton.click();
 
@@ -211,7 +213,16 @@ test("generate flow is authenticated and selects a service only once", async ({
     });
   await expect(backgroundGroup.getByRole("radio", { name: "라이트 그레이" })).toBeChecked();
   await expect(outfitGroup.getByRole("radio", { name: "셔츠 / 블라우스" })).toBeChecked();
+  // Upload preview lives in step 1 and is intentionally hidden in step 2.
+  // Reset must retain the same file/URL; returning to upload makes it visible again.
+  await expect(page.getByAltText("업로드한 사진 미리보기")).toHaveAttribute("src", idPreviewUrl!);
+  await expect(page.getByAltText("업로드한 사진 미리보기")).toBeHidden();
+  await page.getByRole("button", { name: "이전 단계" }).click();
   await expect(page.getByAltText("업로드한 사진 미리보기")).toBeVisible();
+  await expect(page.getByText("id-source.png", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(backgroundGroup.getByRole("radio", { name: "라이트 그레이" })).toBeChecked();
+  await expect(outfitGroup.getByRole("radio", { name: "셔츠 / 블라우스" })).toBeChecked();
 
   // id-photo has no free-text common request field; the current equivalent guidance is the flow note, and additionalRequest must stay absent (not silently invented).
   await expect(page.getByText(
