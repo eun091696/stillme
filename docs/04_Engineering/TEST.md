@@ -174,6 +174,14 @@ credential marker와 CI synthetic canary가 발견되면 실패합니다. Securi
 browser test는 request별 nonce CSP, production unsafe exception 부재,
 Next.js script nonce, same-origin과 streaming request limit을 검증합니다.
 
+생성 흐름 E2E는 증명사진 업로드→옵션 2단계와 비즈니스 프로필
+스타일→공통 옵션→업로드 3단계를 검증합니다. 증명사진 옵션 가로 간격은
+현재 CSS 계약 `.45rem`을 root font size에 맞춰 비교하며 12px을 강제하지
+않습니다. 프로필의 공통 배경이 후보 3장에 전달되고, 업로드 전 생성이
+비활성화되며, form reset 후 직업·스타일·배경·추가 요청·미리보기가 보존되는지
+확인합니다. 제거된 후보별 선택 UI는 없는 것으로 검증하되 인증·소유권·MIME·
+접근성·44px 주요 버튼과 단계 이동 검사는 유지합니다.
+
 ### Current Automated Matrix
 
 | Capability | Unit/contract | DB/RLS | Integration | Browser/operational | Remaining gate |
