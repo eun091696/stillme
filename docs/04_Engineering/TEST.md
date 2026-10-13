@@ -160,8 +160,14 @@ npm run test:all
 ```
 
 `npm run validate`는 production build 후 `npm run performance:check`를 실행해
-App Router page별 gzip JS/CSS 120 KiB와 개별 asset 64 KiB budget을
-검증합니다. AI cost unit test는 versioned microusd rate로 최대 계획 input,
+App Router page별 gzip JS/CSS 기본 120 KiB와 개별 asset 64 KiB budget을
+검증합니다. 2026-10-13 소유자가 승인한 `/`, `/generate`,
+`/generate/[service]`, `/dev/image-generation` 네 route만 임시 140 KiB로
+검사합니다. 새 route에는 이 예외가 자동 적용되지 않으며, 개별 asset
+64 KiB 상한과 공통 JS/CSS 합산은 그대로 유지합니다. 정확한 상한·1 byte
+초과·새 route·개별 asset 초과를 회귀 테스트합니다. 이 예산은 모바일
+로딩 측정으로 검증된 목표가 아니므로 다음 frontend/framework 변경 또는
+모바일 측정 때 소유자와 Frontend owner가 재검토합니다. AI cost unit test는 versioned microusd rate로 최대 계획 input,
 1K image, 추가 text/image와 10,000건 volume projection을 검증합니다.
 `npm run security:bundle-check`는 production client JS/CSS에서 server
 credential marker와 CI synthetic canary가 발견되면 실패합니다. Security
