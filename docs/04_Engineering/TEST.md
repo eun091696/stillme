@@ -160,13 +160,27 @@ npm run test:all
 ```
 
 `npm run validate`는 production build 후 `npm run performance:check`를 실행해
-App Router page별 gzip JS/CSS 120 KiB와 개별 asset 64 KiB budget을
-검증합니다. AI cost unit test는 versioned microusd rate로 최대 계획 input,
+App Router page별 gzip JS/CSS 기본 120 KiB와 개별 asset 64 KiB budget을
+검증합니다. 2026-10-13 소유자가 승인한 `/`, `/generate`,
+`/generate/[service]`, `/dev/image-generation` 네 route만 임시 140 KiB로
+검사합니다. 새 route에는 이 예외가 자동 적용되지 않으며, 개별 asset
+64 KiB 상한과 공통 JS/CSS 합산은 그대로 유지합니다. 정확한 상한·1 byte
+초과·새 route·개별 asset 초과를 회귀 테스트합니다. 이 예산은 모바일
+로딩 측정으로 검증된 목표가 아니므로 다음 frontend/framework 변경 또는
+모바일 측정 때 소유자와 Frontend owner가 재검토합니다. AI cost unit test는 versioned microusd rate로 최대 계획 input,
 1K image, 추가 text/image와 10,000건 volume projection을 검증합니다.
 `npm run security:bundle-check`는 production client JS/CSS에서 server
 credential marker와 CI synthetic canary가 발견되면 실패합니다. Security
 browser test는 request별 nonce CSP, production unsafe exception 부재,
 Next.js script nonce, same-origin과 streaming request limit을 검증합니다.
+
+생성 흐름 E2E는 증명사진 업로드→옵션 2단계와 비즈니스 프로필
+스타일→공통 옵션→업로드 3단계를 검증합니다. 증명사진 옵션 가로 간격은
+현재 CSS 계약 `.45rem`을 root font size에 맞춰 비교하며 12px을 강제하지
+않습니다. 프로필의 공통 배경이 후보 3장에 전달되고, 업로드 전 생성이
+비활성화되며, form reset 후 직업·스타일·배경·추가 요청·미리보기가 보존되는지
+확인합니다. 제거된 후보별 선택 UI는 없는 것으로 검증하되 인증·소유권·MIME·
+접근성·44px 주요 버튼과 단계 이동 검사는 유지합니다.
 
 ### Current Automated Matrix
 

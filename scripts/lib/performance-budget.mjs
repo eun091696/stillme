@@ -3,7 +3,26 @@ import { gzipSync } from "node:zlib";
 export const PERFORMANCE_BUDGET = Object.freeze({
   maximumRouteGzipBytes: 120 * 1024,
   maximumAssetGzipBytes: 64 * 1024,
+  // Owner-approved provisional ceilings, not measured loading-speed targets.
+  // Review these four routes on the next frontend/framework change or mobile measurement.
+  routeGzipByteOverrides: Object.freeze({
+    "/": 140 * 1024,
+    "/generate": 140 * 1024,
+    "/generate/[service]": 140 * 1024,
+    "/dev/image-generation": 140 * 1024,
+  }),
 });
+
+export function maximumRouteGzipBytesFor(route, budget = PERFORMANCE_BUDGET) {
+  const overrides = budget.routeGzipByteOverrides ?? {};
+  const limit = Object.hasOwn(overrides, route)
+    ? overrides[route]
+    : budget.maximumRouteGzipBytes;
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new Error(`Invalid route performance budget for ${route}`);
+  }
+  return limit;
+}
 
 function isAppPage(route) {
   return route === "/page" || route.endsWith("/page");
@@ -62,9 +81,10 @@ export function assertPerformanceBudget(
   const violations = [];
 
   for (const route of routes) {
-    if (route.gzipBytes > budget.maximumRouteGzipBytes) {
+    const maximumRouteGzipBytes = maximumRouteGzipBytesFor(route.route, budget);
+    if (route.gzipBytes > maximumRouteGzipBytes) {
       violations.push(
-        `${route.route} route gzip ${route.gzipBytes} > ${budget.maximumRouteGzipBytes}`,
+        `${route.route} route gzip ${route.gzipBytes} > ${maximumRouteGzipBytes}`,
       );
     }
 

@@ -156,6 +156,8 @@ test("generate flow is authenticated and selects a service only once", async ({
     ),
   });
   await expect(page.getByAltText("업로드한 사진 미리보기")).toBeVisible();
+  const idPreviewUrl = await page.getByAltText("업로드한 사진 미리보기").getAttribute("src");
+  expect(idPreviewUrl).toMatch(/^blob:/u);
   await expect(nextStepButton).toBeEnabled();
   await nextStepButton.click();
 
@@ -185,9 +187,14 @@ test("generate flow is authenticated and selects a service only once", async ({
   await expect(outfitGroup.getByRole("radio", { name: "단정한 정장" })).toBeChecked();
   await expect(page.getByRole("group", { name: "넥타이 · 정장 선택 시" })).toBeVisible();
 
+  // Current compact design uses .45rem, not the former 12px grid.
+  // Check the actual spacing contract instead of dropping the layout guard.
   const optionGridSpacing = await backgroundGroup.locator("div").first()
-    .evaluate((element) => Number.parseFloat(getComputedStyle(element).columnGap));
-  expect(optionGridSpacing).toBeGreaterThanOrEqual(12);
+    .evaluate((element) => ({
+      gap: Number.parseFloat(getComputedStyle(element).columnGap),
+      rootFontSize: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+    }));
+  expect(optionGridSpacing.gap).toBeCloseTo(optionGridSpacing.rootFontSize * 0.45, 1);
   const setupSpacing = await page.locator("form")
     .filter({ has: page.locator('input[name="presetId"]') })
     .evaluate((element) => Number.parseFloat(getComputedStyle(element).rowGap));
@@ -206,7 +213,16 @@ test("generate flow is authenticated and selects a service only once", async ({
     });
   await expect(backgroundGroup.getByRole("radio", { name: "라이트 그레이" })).toBeChecked();
   await expect(outfitGroup.getByRole("radio", { name: "셔츠 / 블라우스" })).toBeChecked();
+  // Upload preview lives in step 1 and is intentionally hidden in step 2.
+  // Reset must retain the same file/URL; returning to upload makes it visible again.
+  await expect(page.getByAltText("업로드한 사진 미리보기")).toHaveAttribute("src", idPreviewUrl!);
+  await expect(page.getByAltText("업로드한 사진 미리보기")).toBeHidden();
+  await page.getByRole("button", { name: "이전 단계" }).click();
   await expect(page.getByAltText("업로드한 사진 미리보기")).toBeVisible();
+  await expect(page.getByText("id-source.png", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(backgroundGroup.getByRole("radio", { name: "라이트 그레이" })).toBeChecked();
+  await expect(outfitGroup.getByRole("radio", { name: "셔츠 / 블라우스" })).toBeChecked();
 
   // id-photo has no free-text common request field; the current equivalent guidance is the flow note, and additionalRequest must stay absent (not silently invented).
   await expect(page.getByText(
@@ -237,7 +253,7 @@ test("generate flow is authenticated and selects a service only once", async ({
   await expect(profession).toBeVisible();
   await expect(profession).toHaveAttribute(
     "placeholder",
-    "예: 의사, 변호사, 개발자, 헤어디자이너",
+    "예: 의사, 건축가",
   );
   await profession.fill("개발자");
   const styleLabels = [
@@ -248,21 +264,37 @@ test("generate flow is authenticated and selects a service only once", async ({
     "모던",
     "고급스러운",
   ];
+  const shootingStyle = page.getByRole("group", { name: "촬영 스타일", exact: true });
   for (const label of styleLabels) {
-    await expect(page.getByRole("radio", { name: label, exact: true }))
+    await expect(shootingStyle.getByRole("radio", { name: label, exact: true }))
       .toBeVisible();
   }
-  await expect(page.getByRole("radio", { name: "추천", exact: true }))
+  await expect(shootingStyle.getByRole("radio", { name: "추천", exact: true }))
     .toBeChecked();
-  await page.getByText("몽환적인", { exact: true }).click();
-  await expect(page.getByRole("radio", { name: "몽환적인", exact: true }))
+  await shootingStyle.getByText("몽환적인", { exact: true }).click();
+  await expect(shootingStyle.getByRole("radio", { name: "몽환적인", exact: true }))
     .toBeChecked();
+  const sharedBackground = page.getByRole("group", { name: "배경 분위기", exact: true });
+  await sharedBackground.getByText("오피스", { exact: true }).click();
   for (const slot of [1, 2, 3]) {
+    await expect(page.locator(`input[name="candidateBackground${slot}"]`))
+      .toHaveValue("office");
     await expect(page.locator(`select[name="candidateOutfit${slot}"]`))
-      .toHaveValue("auto");
-    await expect(page.locator(`select[name="candidateBackground${slot}"]`))
-      .toHaveValue("auto");
+      .toHaveCount(0);
+    await expect(page.locator(`textarea[name="candidateRequest${slot}"]`))
+      .toHaveCount(0);
   }
+
+  // Current profile flow is style -> common options -> upload.
+  const profileSteps = page.getByRole("list", { name: "현재 제작 단계" });
+  await expect(profileSteps.getByRole("listitem")).toHaveCount(3);
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(profileSteps.locator('li[aria-current="step"]')).toHaveText(/옵션/u);
+  await page.getByLabel("추가 요청 (선택)", { exact: true })
+    .fill("전체 후보의 표정을 자연스럽게 만들어 주세요.");
+  await page.getByRole("button", { name: "다음 단계" }).click();
+  await expect(profileSteps.locator('li[aria-current="step"]')).toHaveText(/사진 업로드/u);
+  await expect(page.getByRole("button", { name: "3장 생성하기 · 1 Credit" })).toBeDisabled();
 
   const sourceInput = page.locator('input[name="sourceImage"]');
   await sourceInput.setInputFiles({
@@ -273,12 +305,7 @@ test("generate flow is authenticated and selects a service only once", async ({
       "base64",
     ),
   });
-  await page.locator('select[name="candidateOutfit1"]').selectOption("formal");
-  await page.locator('select[name="candidateBackground1"]').selectOption("office");
-  await page.locator('textarea[name="candidateRequest1"]')
-    .fill("첫 번째 후보는 차분한 인상으로 만들어 주세요.");
-  await page.locator('textarea[name="additionalRequest"]')
-    .fill("전체 후보의 표정을 자연스럽게 만들어 주세요.");
+  await expect(page.getByRole("button", { name: "3장 생성하기 · 1 Credit" })).toBeEnabled();
 
   await page.locator("form")
     .filter({ has: page.locator("#additionalRequest") })
@@ -287,17 +314,19 @@ test("generate flow is authenticated and selects a service only once", async ({
     });
 
   await expect(page.getByAltText("업로드한 사진 미리보기")).toBeVisible();
-  await expect(profession).toHaveValue("개발자");
-  await expect(page.getByRole("radio", { name: "몽환적인", exact: true }))
-    .toBeChecked();
-  await expect(page.locator('select[name="candidateOutfit1"]'))
-    .toHaveValue("formal");
-  await expect(page.locator('select[name="candidateBackground1"]'))
-    .toHaveValue("office");
-  await expect(page.locator('textarea[name="candidateRequest1"]'))
-    .toHaveValue("첫 번째 후보는 차분한 인상으로 만들어 주세요.");
   await expect(page.locator('textarea[name="additionalRequest"]'))
     .toHaveValue("전체 후보의 표정을 자연스럽게 만들어 주세요.");
+  for (const slot of [1, 2, 3]) {
+    await expect(page.locator(`input[name="candidateBackground${slot}"]`)).toHaveValue("office");
+  }
+  await page.getByRole("button", { name: "이전 단계" }).click();
+  await expect(page.getByLabel("추가 요청 (선택)", { exact: true }))
+    .toHaveValue("전체 후보의 표정을 자연스럽게 만들어 주세요.");
+  await page.getByRole("button", { name: "이전 단계" }).click();
+  await expect(profession).toHaveValue("개발자");
+  await expect(shootingStyle.getByRole("radio", { name: "몽환적인", exact: true }))
+    .toBeChecked();
+  await expect(sharedBackground.locator('input[value="office"]')).toBeChecked();
   await expect(page).toHaveURL(/\/generate\/business-profile$/u);
   await expect(
     page.getByRole("navigation", { name: "스튜디오 메뉴" })

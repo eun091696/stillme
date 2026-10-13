@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   assertPerformanceBudget,
   measureAppPageBudgets,
+  maximumRouteGzipBytesFor,
   PERFORMANCE_BUDGET,
 } from "./lib/performance-budget.mjs";
 
@@ -40,6 +41,7 @@ console.log(
       largestRoute: {
         route: largestRoute.route,
         gzipBytes: largestRoute.gzipBytes,
+        maximumGzipBytes: maximumRouteGzipBytesFor(largestRoute.route),
         assetCount: largestRoute.assets.length,
         assets: [...largestRoute.assets]
           .sort((a, b) => b.gzipBytes - a.gzipBytes)
